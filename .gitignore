@@ -1,0 +1,27 @@
+.plan
+
+# Runtime data and cache
+data/
+*.log
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Environment
+.env
+.env.local
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.pyc
+__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
