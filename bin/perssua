@@ -1,0 +1,377 @@
+#!/usr/bin/env bash
+# Perssua - AI-powered audio capture and interaction tool
+# Entry point wrapper for the Perssua application
+#
+# Usage:
+#   perssua              Launch interactive mode
+#   perssua --help       Show this message
+#   perssua --version    Show version
+#   perssua --config     Show configuration status
+
+set -euo pipefail
+
+# ============================================================================
+# CONSTANTS & CONFIGURATION
+# ============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+APPIMAGE="$SCRIPT_DIR/Perssua-0.23.3-x86_64.AppImage"
+EXTRACT_DIR="$PROJECT_ROOT/data"
+APPRUN="$EXTRACT_DIR/squashfs-root/AppRun"
+SANDBOX="$EXTRACT_DIR/squashfs-root/chrome-sandbox"
+LOGS_DIR="$EXTRACT_DIR/logs"
+
+# Data directory: configurable via env, defaults to extract dir
+DATA_DIR="${PERSSUA_DATA_DIR:-$EXTRACT_DIR}"
+
+# Logging configuration
+# LOG_LEVEL: DEBUG, INFO (default), WARN, ERROR
+DEBUG="${PERSSUA_DEBUG:-0}"
+LOG_LEVEL="${PERSSUA_LOG_LEVEL:-INFO}"
+LOG_FORMAT="${PERSSUA_LOG_FORMAT:-human}"
+LOG_FILE="$LOGS_DIR/perssua.log"
+
+# Map legacy PERSSUA_DEBUG=1 to LOG_LEVEL=DEBUG
+[[ "$DEBUG" == "1" ]] && LOG_LEVEL="DEBUG"
+
+# Validate log level
+case "$LOG_LEVEL" in
+  DEBUG|INFO|WARN|ERROR) ;;
+  *)
+    LOG_LEVEL="INFO"
+    ;;
+esac
+
+# Validate log format
+case "$LOG_FORMAT" in
+  human|json) ;;
+  *)
+    LOG_FORMAT="human"
+    ;;
+esac
+
+# Log level ordering: DEBUG < INFO < WARN < ERROR
+declare -A LOG_LEVEL_NUM=(
+  [DEBUG]=0
+  [INFO]=1
+  [WARN]=2
+  [ERROR]=3
+)
+CURRENT_LOG_LEVEL_NUM=${LOG_LEVEL_NUM[$LOG_LEVEL]}
+
+# Version matches AppImage version
+VERSION="0.23.3"
+
+# ============================================================================
+# UTILITY FUNCTIONS - LOGGING
+# ============================================================================
+
+# Get current timestamp in ISO 8601 format
+get_timestamp() {
+  date -u '+%Y-%m-%dT%H:%M:%S.%3NZ' 2>/dev/null || date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+# Write log entry
+_log() {
+  local level="$1"
+  local message="$2"
+  local module="${3:-launcher}"
+
+  # Check if should log based on level
+  local level_num=${LOG_LEVEL_NUM[$level]:-1}
+  if [[ $level_num -lt $CURRENT_LOG_LEVEL_NUM ]]; then
+    return 0
+  fi
+
+  local timestamp=$(get_timestamp)
+
+  if [[ "$LOG_FORMAT" == "json" ]]; then
+    # JSON output
+    printf '{"timestamp":"%s","level":"%s","module":"%s","message":"%s"}\n' \
+      "$timestamp" "$level" "$module" "$(echo "$message" | sed 's/"/\\"/g')" >&2
+  else
+    # Human-readable output with color
+    local prefix=""
+    case "$level" in
+      DEBUG)  prefix="[DEBUG]" ;;
+      INFO)   prefix="i" ;;
+      WARN)   prefix="⚠" ;;
+      ERROR)  prefix="✗ Error:" ;;
+    esac
+    echo "$prefix $message" >&2
+  fi
+
+  # Always append to log file (if writable)
+  if [[ -w "$LOG_FILE" ]] || [[ -w "$LOGS_DIR" ]]; then
+    printf '[%s] [%s] %s\n' "$timestamp" "$level" "$message" >> "$LOG_FILE" 2>/dev/null || true
+  fi
+}
+
+log_debug() {
+  _log "DEBUG" "$1" "launcher"
+}
+
+log_info() {
+  _log "INFO" "$1" "launcher"
+}
+
+log_warn() {
+  _log "WARN" "$1" "launcher"
+}
+
+log_error() {
+  _log "ERROR" "$1" "launcher"
+}
+
+log_success() {
+  _log "INFO" "✓ $1" "launcher"
+}
+
+die() {
+  log_error "$1"
+  exit "${2:-1}"
+}
+
+# ============================================================================
+# COMMAND HANDLERS
+# ============================================================================
+
+show_version() {
+  cat << EOF
+Perssua v$VERSION
+Audio capture and AI interaction tool
+
+For more info: perssua --help
+EOF
+}
+
+show_help() {
+  cat << EOF
+Perssua - AI-powered audio capture and interaction tool
+
+USAGE:
+  perssua [OPTIONS]
+
+OPTIONS:
+  --help                Show this message
+  --version             Show version information
+  --config              Show configuration status
+  --data-dir <path>     Override data directory
+  --debug               Enable debug logging
+
+ENVIRONMENT VARIABLES:
+  PERSSUA_DATA_DIR      Override data directory path
+  PERSSUA_LOG_LEVEL     Log level: DEBUG, INFO (default), WARN, ERROR
+  PERSSUA_LOG_FORMAT    Log format: human (default), json
+  PERSSUA_DEBUG         Enable debug output (0 or 1, legacy, maps to LOG_LEVEL=DEBUG)
+
+LOGGING EXAMPLES:
+  perssua                                      # Normal (INFO level)
+  PERSSUA_LOG_LEVEL=DEBUG perssua             # Debug all details
+  PERSSUA_LOG_LEVEL=ERROR perssua             # Only errors
+  PERSSUA_LOG_FORMAT=json perssua 2>&1 | jq  # Structured JSON output
+  tail -f data/logs/perssua.log               # Monitor logs in real-time
+
+DATA & CONFIGURATION:
+  perssua --config                            # Show status
+  PERSSUA_DATA_DIR=/tmp/p perssua            # Custom data directory
+
+DOCUMENTATION:
+  README.md               - Quick start guide
+  docs/TREE.md            - Project structure overview
+  docs/GUIDE.md           - Complete setup & architecture guide
+  logging/GUIDE.md        - Logging & observability guide
+  docs/TROUBLESHOOT.md    - Troubleshooting & FAQ
+
+For issues or questions, see the documentation or run: perssua --config
+
+EOF
+}
+
+show_config() {
+  local appimage_exists="MISSING"
+  local apprun_exists="NOT EXTRACTED"
+  local apprun_executable="no"
+  local sandbox_exists="no"
+  local sandbox_perms="—"
+  local logs_writable="no"
+  local log_file_size="—"
+
+  [[ -f "$APPIMAGE" ]] && appimage_exists="OK"
+  [[ -x "$APPRUN" ]] && apprun_exists="OK" && apprun_executable="yes"
+  [[ -f "$SANDBOX" ]] && sandbox_exists="yes" && sandbox_perms=$(stat -c '%U:%a' "$SANDBOX" 2>/dev/null || echo "?")
+  [[ -w "$LOGS_DIR" ]] && logs_writable="yes"
+  [[ -f "$LOG_FILE" ]] && log_file_size=$(du -h "$LOG_FILE" 2>/dev/null | cut -f1 || echo "?")
+
+  cat << EOF
+Perssua Configuration Status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PROJECT:
+  Root                 $PROJECT_ROOT
+  Launcher             $SCRIPT_DIR
+
+APPIMAGE:
+  Binary               $APPIMAGE
+  Status               $appimage_exists
+  Size                 $(du -sh "$APPIMAGE" 2>/dev/null | cut -f1 || echo "—")
+
+EXTRACTED STATE:
+  AppRun               $apprun_exists
+  Executable           $apprun_executable
+  Sandbox Helper       $sandbox_exists ($sandbox_perms)
+
+RUNTIME CONFIGURATION:
+  Data Directory       $DATA_DIR
+  Log Level            $LOG_LEVEL
+  Log Format           $LOG_FORMAT
+  Log File             $LOG_FILE
+  Logs Writable        $logs_writable
+  Log File Size        $log_file_size
+
+SYSTEM:
+  OS                   $(uname -s)
+  Architecture         $(uname -m)
+  FUSE Support         $(which fuse >/dev/null 2>&1 && echo "yes" || echo "no")
+
+LOGGING:
+  • View logs:         tail -f data/logs/perssua.log
+  • Debug mode:        PERSSUA_LOG_LEVEL=DEBUG perssua
+  • JSON format:       PERSSUA_LOG_FORMAT=json perssua 2>&1 | jq
+  • Read more:         See logging/GUIDE.md
+
+NEXT STEPS:
+  • Run 'perssua' to start (will extract and configure on first run)
+  • Check docs/GUIDE.md for detailed setup
+  • Check logging/GUIDE.md for observability & logging
+  • Check docs/TROUBLESHOOT.md if you encounter issues
+  • See docs/TREE.md for project structure
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EOF
+}
+
+# ============================================================================
+# VALIDATION & SETUP
+# ============================================================================
+
+validate_prerequisites() {
+  log_debug "Validating prerequisites..."
+
+  if [[ ! -f "$APPIMAGE" ]]; then
+    log_error "AppImage not found at $APPIMAGE"
+    die "AppImage not found at $APPIMAGE" 1
+  fi
+  log_debug "AppImage found: $(du -h "$APPIMAGE" | cut -f1)"
+
+  if ! command -v fuse &> /dev/null; then
+    log_error "FUSE not installed"
+    die "FUSE not installed. Install with: sudo apt install fuse (Debian) or sudo dnf install fuse (Fedora)" 1
+  fi
+  log_debug "FUSE available"
+
+  log_success "Prerequisites OK"
+}
+
+extract_appimage() {
+  if [[ ! -x "$APPRUN" || "$APPIMAGE" -nt "$APPRUN" ]]; then
+    log_info "Extracting AppImage (first run may take a moment)..."
+    rm -rf "$EXTRACT_DIR/squashfs-root"
+    ( cd "$SCRIPT_DIR" && "$APPIMAGE" --appimage-extract >/dev/null 2>&1 ) || \
+      die "Failed to extract AppImage" 1
+    mv "$SCRIPT_DIR/squashfs-root" "$EXTRACT_DIR/squashfs-root"
+    log_success "AppImage extracted"
+  else
+    log_debug "AppImage already extracted"
+  fi
+}
+
+configure_sandbox() {
+  local current_perms
+  current_perms=$(stat -c '%U:%a' "$SANDBOX" 2>/dev/null || echo "missing")
+
+  if [[ "$current_perms" != "root:4755" ]]; then
+    log_info "Configuring Chrome sandbox (needs sudo, one-time only)..."
+    sudo chown root:root "$SANDBOX" || die "Failed to chown sandbox" 1
+    sudo chmod 4755 "$SANDBOX" || die "Failed to chmod sandbox" 1
+    log_success "Sandbox configured"
+  else
+    log_debug "Sandbox already configured"
+  fi
+}
+
+prepare_runtime() {
+  mkdir -p "$DATA_DIR"
+  mkdir -p "$LOGS_DIR"
+  log_debug "Data directory ready: $DATA_DIR"
+  log_debug "Logs directory ready: $LOGS_DIR"
+
+  # Initialize log file
+  if ! [[ -f "$LOG_FILE" ]]; then
+    touch "$LOG_FILE" 2>/dev/null || true
+  fi
+}
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+main() {
+  # Parse arguments
+  case "${1:-}" in
+    --version|-v)
+      show_version
+      exit 0
+      ;;
+    --help|-h|help)
+      show_help
+      exit 0
+      ;;
+    --config)
+      show_config
+      exit 0
+      ;;
+    --data-dir)
+      DATA_DIR="$2"
+      shift 2
+      ;;
+    --debug)
+      DEBUG="1"
+      ;;
+    *)
+      # Fall through to launch
+      ;;
+  esac
+
+  log_debug "Starting Perssua launcher (v$VERSION)"
+  log_debug "Project root: $PROJECT_ROOT"
+
+  # Setup phase
+  validate_prerequisites
+  extract_appimage
+  configure_sandbox
+  prepare_runtime
+
+  # Runtime configuration for X11/Wayland issues
+  log_debug "Configuring display server (X11 mode for audio/screen-share stability)"
+  unset XDG_SESSION_TYPE WAYLAND_DISPLAY
+  export APPDIR="$EXTRACT_DIR/squashfs-root"
+
+  log_info "Starting Perssua..."
+  log_debug "Using data directory: $DATA_DIR"
+
+  # Launch application
+  exec "$APPRUN" \
+    --user-data-dir="$DATA_DIR" \
+    --ozone-platform=x11 \
+    --disable-features=WebRtcPipeWireCapturer \
+    "$@"
+}
+
+# ============================================================================
+# ENTRY POINT
+# ============================================================================
+
+main "$@"
