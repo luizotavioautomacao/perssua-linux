@@ -4,16 +4,17 @@
 .DEFAULT_GOAL := help
 
 # Project paths
+SHELL := /bin/bash
 PROJECT_ROOT := $(shell pwd)
 BIN_DIR := $(PROJECT_ROOT)/bin
 PERSSUA := $(BIN_DIR)/perssua
 
 # Color output
-BOLD := \033[1m
-BLUE := \033[34m
-GREEN := \033[32m
-YELLOW := \033[33m
-RESET := \033[0m
+BOLD := $(shell printf '\033[1m')
+BLUE := $(shell printf '\033[34m')
+GREEN := $(shell printf '\033[32m')
+YELLOW := $(shell printf '\033[33m')
+RESET := $(shell printf '\033[0m')
 
 # ============================================================================
 # TARGETS
