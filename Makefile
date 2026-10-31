@@ -1,4 +1,4 @@
-.PHONY: help up install install-user install-system uninstall config debug debug-json version validate test test-full test-verbose test-no-cleanup lint tail-logs
+.PHONY: help up install install-user install-system configure-sandbox uninstall config debug debug-json version validate test test-full test-verbose test-no-cleanup lint tail-logs
 
 # Default target
 .DEFAULT_GOAL := help
@@ -23,15 +23,16 @@ help:
 	@echo "$(BOLD)Perssua - AI-powered Audio Capture Tool$(RESET)"
 	@echo ""
 	@echo "$(BOLD)Usage:$(RESET)"
-	@echo "  make $(GREEN)up$(RESET)                 Launch Perssua application"
-	@echo "  make $(GREEN)install-user$(RESET)       Install 'perssua' command for current user"
-	@echo "  make $(GREEN)install-system$(RESET)     Install 'perssua' command system-wide (needs sudo)"
-	@echo "  make $(GREEN)uninstall$(RESET)          Remove 'perssua' command"
-	@echo "  make $(GREEN)config$(RESET)             Show configuration status"
-	@echo "  make $(GREEN)debug$(RESET)              Launch with debug logging enabled"
-	@echo "  make $(GREEN)debug-json$(RESET)         Launch with debug logging (JSON format)"
-	@echo "  make $(GREEN)version$(RESET)            Show version information"
-	@echo "  make $(GREEN)help$(RESET)               Show this help message"
+	@echo "  make $(GREEN)up$(RESET)                   Launch Perssua application"
+	@echo "  make $(GREEN)install-user$(RESET)        Install 'perssua' command for current user"
+	@echo "  make $(GREEN)install-system$(RESET)      Install 'perssua' command system-wide (needs sudo)"
+	@echo "  make $(GREEN)configure-sandbox$(RESET)   Configure Chrome sandbox (one-time setup)"
+	@echo "  make $(GREEN)uninstall$(RESET)           Remove 'perssua' command"
+	@echo "  make $(GREEN)config$(RESET)              Show configuration status"
+	@echo "  make $(GREEN)debug$(RESET)               Launch with debug logging enabled"
+	@echo "  make $(GREEN)debug-json$(RESET)          Launch with debug logging (JSON format)"
+	@echo "  make $(GREEN)version$(RESET)             Show version information"
+	@echo "  make $(GREEN)help$(RESET)                Show this help message"
 	@echo ""
 	@echo "$(BOLD)Development:$(RESET)"
 	@echo "  make $(GREEN)validate$(RESET)           Validate prerequisites and configuration"
@@ -96,6 +97,17 @@ install-deps:
 	fi
 	@if which fusermount3 >/dev/null 2>&1; then \
 		echo "$(GREEN)✓ FUSE3 installed$(RESET)"; \
+	fi
+
+configure-sandbox:
+	@echo "$(BLUE)[Setup] Configuring Chrome sandbox (one-time, needs sudo)...$(RESET)"
+	@SANDBOX_PATH="$(PROJECT_ROOT)/data/squashfs-root/chrome-sandbox"; \
+	if [[ -f "$$SANDBOX_PATH" ]]; then \
+		sudo chown root:root "$$SANDBOX_PATH" && \
+		sudo chmod 4755 "$$SANDBOX_PATH" && \
+		echo "$(GREEN)✓ Sandbox configured$(RESET)"; \
+	else \
+		echo "$(YELLOW)⚠ AppImage not extracted yet. Run 'make up' first.$(RESET)"; \
 	fi
 
 install-user:
