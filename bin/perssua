@@ -16,7 +16,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-APPIMAGE="$SCRIPT_DIR/Perssua-0.23.3-x86_64.AppImage"
+# Version matches AppImage version (latest stable: https://perssua.com/pt/downloads)
+VERSION="0.27.5"
+APPIMAGE="$SCRIPT_DIR/Perssua-${VERSION}-x86_64.AppImage"
 EXTRACT_DIR="$PROJECT_ROOT/data"
 APPRUN="$EXTRACT_DIR/squashfs-root/AppRun"
 SANDBOX="$EXTRACT_DIR/squashfs-root/chrome-sandbox"
@@ -60,8 +62,6 @@ declare -A LOG_LEVEL_NUM=(
 )
 CURRENT_LOG_LEVEL_NUM=${LOG_LEVEL_NUM[$LOG_LEVEL]}
 
-# Version matches AppImage version
-VERSION="0.23.3"
 
 # ============================================================================
 # UTILITY FUNCTIONS - LOGGING
@@ -197,12 +197,15 @@ show_config() {
   local sandbox_perms="—"
   local logs_writable="no"
   local log_file_size="—"
+  local audio_available="no"
+  local pulse_socket="/run/user/$(id -u)/pulse/native"
 
   [[ -f "$APPIMAGE" ]] && appimage_exists="OK"
   [[ -x "$APPRUN" ]] && apprun_exists="OK" && apprun_executable="yes"
   [[ -f "$SANDBOX" ]] && sandbox_exists="yes" && sandbox_perms=$(stat -c '%U:%a' "$SANDBOX" 2>/dev/null || echo "?")
   [[ -w "$LOGS_DIR" ]] && logs_writable="yes"
   [[ -f "$LOG_FILE" ]] && log_file_size=$(du -h "$LOG_FILE" 2>/dev/null | cut -f1 || echo "?")
+  [[ -S "$pulse_socket" ]] && audio_available="yes"
 
   cat << EOF
 Perssua Configuration Status
@@ -233,7 +236,12 @@ RUNTIME CONFIGURATION:
 SYSTEM:
   OS                   $(uname -s)
   Architecture         $(uname -m)
-  FUSE Support         $(which fuse >/dev/null 2>&1 && echo "yes" || echo "no")
+  FUSE3 Support        $(which fusermount3 >/dev/null 2>&1 && echo "yes" || echo "no")
+  Audio Available      $audio_available
+
+AUDIO:
+  • PulseAudio socket: $(if [[ -S "$pulse_socket" ]]; then echo "✓ Available"; else echo "✗ Not found"; fi)
+  • Socket location:   $pulse_socket
 
 LOGGING:
   • View logs:         tail -f data/logs/perssua.log
@@ -266,11 +274,11 @@ validate_prerequisites() {
   fi
   log_debug "AppImage found: $(du -h "$APPIMAGE" | cut -f1)"
 
-  if ! command -v fuse &> /dev/null; then
-    log_error "FUSE not installed"
-    die "FUSE not installed. Install with: sudo apt install fuse (Debian) or sudo dnf install fuse (Fedora)" 1
+  if ! command -v fusermount3 &> /dev/null && ! command -v fuse &> /dev/null; then
+    log_error "FUSE3 not installed"
+    die "FUSE3 not installed. Install with: sudo apt install fuse3 (Debian) or sudo dnf install fuse3 (Fedora)" 1
   fi
-  log_debug "FUSE available"
+  log_debug "FUSE3 available"
 
   log_success "Prerequisites OK"
 }
@@ -278,6 +286,7 @@ validate_prerequisites() {
 extract_appimage() {
   if [[ ! -x "$APPRUN" || "$APPIMAGE" -nt "$APPRUN" ]]; then
     log_info "Extracting AppImage (first run may take a moment)..."
+    mkdir -p "$EXTRACT_DIR"
     rm -rf "$EXTRACT_DIR/squashfs-root"
     ( cd "$SCRIPT_DIR" && "$APPIMAGE" --appimage-extract >/dev/null 2>&1 ) || \
       die "Failed to extract AppImage" 1
@@ -299,6 +308,33 @@ configure_sandbox() {
     log_success "Sandbox configured"
   else
     log_debug "Sandbox already configured"
+  fi
+}
+
+prepare_audio() {
+  log_debug "Configuring audio access..."
+
+  # PulseAudio socket location
+  local pulse_socket="/run/user/$(id -u)/pulse/native"
+
+  if [[ -S "$pulse_socket" ]]; then
+    log_debug "PulseAudio socket found at $pulse_socket"
+    export PULSE_SERVER="unix:$pulse_socket"
+  else
+    log_debug "PulseAudio socket not found, PulseAudio may auto-connect"
+  fi
+
+  # PipeWire support (needed for modern audio on Linux)
+  if [[ -d "/run/user/$(id -u)/pipewire-0" ]]; then
+    log_debug "PipeWire socket detected"
+    export PIPEWIRE_RUNTIME_DIR="/run/user/$(id -u)"
+  fi
+
+  # Enable PulseAudio cookie-based authentication if available
+  local pulse_cookie="$HOME/.config/pulse/cookie"
+  if [[ -f "$pulse_cookie" ]]; then
+    export PULSE_COOKIE="$pulse_cookie"
+    log_debug "PulseAudio cookie configured"
   fi
 }
 
@@ -353,20 +389,21 @@ main() {
   extract_appimage
   configure_sandbox
   prepare_runtime
+  prepare_audio
 
   # Runtime configuration for X11/Wayland issues
   log_debug "Configuring display server (X11 mode for audio/screen-share stability)"
-  unset XDG_SESSION_TYPE WAYLAND_DISPLAY
   export APPDIR="$EXTRACT_DIR/squashfs-root"
 
   log_info "Starting Perssua..."
   log_debug "Using data directory: $DATA_DIR"
 
-  # Launch application
-  exec "$APPRUN" \
+  # Launch application with isolated environment
+  # Only override display settings for this process, preserve system session
+  # Note: WebRtcPipeWireCapturer is ENABLED to support PipeWire audio/screen capture
+  XDG_SESSION_TYPE=x11 WAYLAND_DISPLAY= exec "$APPRUN" \
     --user-data-dir="$DATA_DIR" \
     --ozone-platform=x11 \
-    --disable-features=WebRtcPipeWireCapturer \
     "$@"
 }
 

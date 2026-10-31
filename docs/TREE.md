@@ -7,7 +7,7 @@ perssua-linux/
 ├── bin/                                    # Executables & binaries
 │   ├── perssua                             # Main launcher script
 │   ├── setup.sh                            # Installation helper script
-│   └── Perssua-0.23.3-x86_64.AppImage     # Application binary
+│   └── Perssua-0.27.5-x86_64.AppImage     # Application binary
 │
 ├── data/                                   # Runtime state (.gitignored)
 │   ├── config/                             # User configuration (created on first run)
@@ -62,7 +62,7 @@ perssua-linux/
     - `PERSSUA_DATA_DIR` — Override data directory
   - Command-line flags:
     - `--help` — Show usage
-    - `--version` — Show version (0.23.3)
+    - `--version` — Show version (0.27.5)
     - `--config` — Show configuration status
 
 ### `bin/setup.sh` - Installation Helper
@@ -80,7 +80,7 @@ perssua-linux/
   - Idempotent: safe to run multiple times
   - Dependency checking (verifies FUSE availability)
 
-### `bin/Perssua-0.23.3-x86_64.AppImage` - Application Binary
+### `bin/Perssua-0.27.5-x86_64.AppImage` - Application Binary
 - **Type:** Self-contained AppImage (Linux universal format)
 - **Size:** ~193 MB
 - **Purpose:** Immutable, pre-built application runtime
@@ -92,7 +92,7 @@ perssua-linux/
   - System libraries
   - All dependencies bundled
 - **Notes:**
-  - Version locked (0.23.3)
+  - Version locked (0.27.5)
   - Read-only (immutable)
   - Extracted to `data/squashfs-root/` on first run
   - Requires FUSE for mounting
@@ -319,7 +319,7 @@ perssua-linux/
 ```
 User Commands
 ├─ perssua → bin/perssua (launcher)
-│  ├─ Uses: bin/Perssua-0.23.3-x86_64.AppImage
+│  ├─ Uses: bin/Perssua-0.27.5-x86_64.AppImage
 │  ├─ Creates: data/squashfs-root/ (extraction)
 │  ├─ Writes: data/logs/perssua.log
 │  └─ References: data/config/ (user config)
@@ -356,7 +356,7 @@ User runs: perssua
     ↓
 Invokes: bin/perssua (launcher)
     ↓
-Reads: bin/Perssua-0.23.3-x86_64.AppImage
+Reads: bin/Perssua-0.27.5-x86_64.AppImage
     ↓
 Extracts to: data/squashfs-root/AppRun
     ↓
@@ -482,5 +482,5 @@ sudo zypper install fuse
 ---
 
 **Last Updated:** 2026-07-07  
-**Version:** 0.23.3  
+**Version:** 0.27.5  
 **Status:** Production Ready

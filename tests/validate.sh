@@ -123,7 +123,7 @@ test_help_command() {
 test_version_command() {
   print_test 3 "Version command works"
   if output=$("$PROJECT_ROOT/bin/perssua" --version 2>&1); then
-    if echo "$output" | grep -q "0.23.3"; then
+    if echo "$output" | grep -q "0.27.5"; then
       pass
     else
       fail "Version output doesn't contain version number"
@@ -387,7 +387,7 @@ test_make_config() {
 test_make_version() {
   print_test 22 "make version command works"
   if output=$(cd "$PROJECT_ROOT" && make version 2>&1); then
-    if echo "$output" | grep -q "0.23.3"; then
+    if echo "$output" | grep -q "0.27.5"; then
       pass
     else
       fail "make version output missing version"

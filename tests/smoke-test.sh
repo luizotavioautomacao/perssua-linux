@@ -34,7 +34,7 @@ info "Test 1: Help command"
 # Test 2: Version
 info "Test 2: Version command"
 output=$("$PERSSUA" --version 2>&1)
-echo "$output" | grep -q "0.23.3" && pass "Version works" || fail "Version failed"
+echo "$output" | grep -q "0.27.5" && pass "Version works" || fail "Version failed"
 
 # Test 3: Config
 info "Test 3: Config command"
