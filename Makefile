@@ -77,25 +77,25 @@ config:
 # ============================================================================
 
 install-deps:
-	@echo "$(BLUE)[Setup] Installing system dependencies (FUSE)...$(RESET)"
+	@echo "$(BLUE)[Setup] Installing system dependencies (FUSE3)...$(RESET)"
 	@if command -v apt &>/dev/null; then \
 		echo "$(BLUE)[Setup] Detected: Ubuntu/Debian$(RESET)"; \
-		sudo apt update && sudo apt install -y fuse; \
+		sudo apt update && sudo apt install -y fuse3; \
 	elif command -v dnf &>/dev/null; then \
 		echo "$(BLUE)[Setup] Detected: Fedora/RHEL$(RESET)"; \
-		sudo dnf install -y fuse; \
+		sudo dnf install -y fuse3; \
 	elif command -v zypper &>/dev/null; then \
 		echo "$(BLUE)[Setup] Detected: openSUSE$(RESET)"; \
-		sudo zypper install -y fuse; \
+		sudo zypper install -y fuse3; \
 	elif command -v pacman &>/dev/null; then \
 		echo "$(BLUE)[Setup] Detected: Arch Linux$(RESET)"; \
-		sudo pacman -S --noconfirm fuse; \
+		sudo pacman -S --noconfirm fuse3; \
 	else \
 		echo "$(YELLOW)[Setup] Could not detect package manager$(RESET)"; \
-		echo "$(YELLOW)Please install FUSE manually: sudo apt install fuse (or equivalent)$(RESET)"; \
+		echo "$(YELLOW)Please install FUSE3 manually: sudo apt install fuse3 (or equivalent)$(RESET)"; \
 	fi
-	@if which fuse >/dev/null 2>&1; then \
-		echo "$(GREEN)✓ FUSE installed$(RESET)"; \
+	@if which fusermount3 >/dev/null 2>&1; then \
+		echo "$(GREEN)✓ FUSE3 installed$(RESET)"; \
 	fi
 
 install-user:
@@ -120,7 +120,7 @@ uninstall:
 
 validate:
 	@echo "$(BLUE)[Check] Validating prerequisites...$(RESET)"
-	@which fuse >/dev/null 2>&1 && echo "$(GREEN)✓ FUSE installed$(RESET)" || echo "$(YELLOW)✗ FUSE not found$(RESET)"
+	@which fusermount3 >/dev/null 2>&1 && echo "$(GREEN)✓ FUSE3 installed$(RESET)" || echo "$(YELLOW)✗ FUSE3 not found$(RESET)"
 	@[[ -f "$(PERSSUA)" ]] && echo "$(GREEN)✓ Launcher found$(RESET)" || echo "$(YELLOW)✗ Launcher not found$(RESET)"
 	@[[ -f "$(BIN_DIR)/Perssua-0.23.3-x86_64.AppImage" ]] && echo "$(GREEN)✓ AppImage found$(RESET)" || echo "$(YELLOW)✗ AppImage not found$(RESET)"
 	@which perssua >/dev/null 2>&1 && echo "$(GREEN)✓ perssua command available$(RESET)" || echo "$(YELLOW)✗ perssua not in PATH$(RESET)"
