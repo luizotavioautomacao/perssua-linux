@@ -197,12 +197,15 @@ show_config() {
   local sandbox_perms="—"
   local logs_writable="no"
   local log_file_size="—"
+  local audio_available="no"
+  local pulse_socket="/run/user/$(id -u)/pulse/native"
 
   [[ -f "$APPIMAGE" ]] && appimage_exists="OK"
   [[ -x "$APPRUN" ]] && apprun_exists="OK" && apprun_executable="yes"
   [[ -f "$SANDBOX" ]] && sandbox_exists="yes" && sandbox_perms=$(stat -c '%U:%a' "$SANDBOX" 2>/dev/null || echo "?")
   [[ -w "$LOGS_DIR" ]] && logs_writable="yes"
   [[ -f "$LOG_FILE" ]] && log_file_size=$(du -h "$LOG_FILE" 2>/dev/null | cut -f1 || echo "?")
+  [[ -S "$pulse_socket" ]] && audio_available="yes"
 
   cat << EOF
 Perssua Configuration Status
@@ -234,6 +237,11 @@ SYSTEM:
   OS                   $(uname -s)
   Architecture         $(uname -m)
   FUSE3 Support        $(which fusermount3 >/dev/null 2>&1 && echo "yes" || echo "no")
+  Audio Available      $audio_available
+
+AUDIO:
+  • PulseAudio socket: $(if [[ -S "$pulse_socket" ]]; then echo "✓ Available"; else echo "✗ Not found"; fi)
+  • Socket location:   $pulse_socket
 
 LOGGING:
   • View logs:         tail -f data/logs/perssua.log
@@ -303,6 +311,33 @@ configure_sandbox() {
   fi
 }
 
+prepare_audio() {
+  log_debug "Configuring audio access..."
+
+  # PulseAudio socket location
+  local pulse_socket="/run/user/$(id -u)/pulse/native"
+
+  if [[ -S "$pulse_socket" ]]; then
+    log_debug "PulseAudio socket found at $pulse_socket"
+    export PULSE_SERVER="unix:$pulse_socket"
+  else
+    log_debug "PulseAudio socket not found, PulseAudio may auto-connect"
+  fi
+
+  # PipeWire support (needed for modern audio on Linux)
+  if [[ -d "/run/user/$(id -u)/pipewire-0" ]]; then
+    log_debug "PipeWire socket detected"
+    export PIPEWIRE_RUNTIME_DIR="/run/user/$(id -u)"
+  fi
+
+  # Enable PulseAudio cookie-based authentication if available
+  local pulse_cookie="$HOME/.config/pulse/cookie"
+  if [[ -f "$pulse_cookie" ]]; then
+    export PULSE_COOKIE="$pulse_cookie"
+    log_debug "PulseAudio cookie configured"
+  fi
+}
+
 prepare_runtime() {
   mkdir -p "$DATA_DIR"
   mkdir -p "$LOGS_DIR"
@@ -354,20 +389,21 @@ main() {
   extract_appimage
   configure_sandbox
   prepare_runtime
+  prepare_audio
 
   # Runtime configuration for X11/Wayland issues
   log_debug "Configuring display server (X11 mode for audio/screen-share stability)"
-  unset XDG_SESSION_TYPE WAYLAND_DISPLAY
   export APPDIR="$EXTRACT_DIR/squashfs-root"
 
   log_info "Starting Perssua..."
   log_debug "Using data directory: $DATA_DIR"
 
-  # Launch application
-  exec "$APPRUN" \
+  # Launch application with isolated environment
+  # Only override display settings for this process, preserve system session
+  # Note: WebRtcPipeWireCapturer is ENABLED to support PipeWire audio/screen capture
+  XDG_SESSION_TYPE=x11 WAYLAND_DISPLAY= exec "$APPRUN" \
     --user-data-dir="$DATA_DIR" \
     --ozone-platform=x11 \
-    --disable-features=WebRtcPipeWireCapturer \
     "$@"
 }
 
