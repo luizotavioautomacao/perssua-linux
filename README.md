@@ -2,7 +2,7 @@
 
 Professional Linux application for real-time audio capture and AI-powered interaction.
 
-**Status:** ✅ Production Ready | **Version:** 0.23.3 | **Build Date:** 2026-07-06
+**Status:** ✅ Production Ready | **Version:** 0.27.5 | **Build Date:** 2026-07-06
 
 ---
 
@@ -170,7 +170,7 @@ perssua-app/
 ├── bin/                          # Executables
 │   ├── perssua                   # Main launcher (250+ lines, professionl)
 │   ├── setup.sh                  # Installation helper
-│   └── Perssua-0.23.3-x86_64.AppImage  # Application binary (193 MB)
+│   └── Perssua-0.27.5-x86_64.AppImage  # Application binary (193 MB)
 │
 ├── data/                         # Runtime state (.gitignored)
 │   ├── config/                   # User configuration (created on first run)
@@ -353,6 +353,6 @@ No re-installation needed - Symlink points to git checkout.
 
 ---
 
-**Version:** 0.23.3 | **Status:** ✅ Production Ready  
+**Version:** 0.27.5 | **Status:** ✅ Production Ready  
 **Installation:** `make install` (one command!)  
 **Global Command:** ✅ WORKING (`perssua`)

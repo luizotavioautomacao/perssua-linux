@@ -125,7 +125,7 @@ bin/perssua script:
     1. Parse arguments (--version, --help, --config, etc.)
     2. Validate prerequisites (FUSE installed?)
     3. Extract AppImage if needed
-       - From: bin/Perssua-0.23.3-x86_64.AppImage
+       - From: bin/Perssua-0.27.5-x86_64.AppImage
        - To: data/squashfs-root/
        - When: First run or if binary is newer
     4. Configure chrome-sandbox (one-time, needs sudo)
@@ -328,7 +328,7 @@ ls -l bin/Perssua-*.AppImage
 
 # 4. Try manual extraction
 cd bin/
-./Perssua-0.23.3-x86_64.AppImage --appimage-extract
+./Perssua-0.27.5-x86_64.AppImage --appimage-extract
 ```
 
 ### Debug Mode
@@ -505,4 +505,4 @@ Makefile         ← Automation
 ---
 
 **Last Updated:** 2026-07-06  
-**Version:** 0.23.3
+**Version:** 0.27.5

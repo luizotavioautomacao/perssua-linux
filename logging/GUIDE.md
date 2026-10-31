@@ -72,7 +72,7 @@ perssua
 
 **Saída:**
 ```
-i Starting Perssua launcher (v0.23.3)
+i Starting Perssua launcher (v0.27.5)
 [DEBUG] Project root: /home/user/perssua-app
 ✓ Prerequisites OK
 i Extracting AppImage...
@@ -94,7 +94,7 @@ PERSSUA_LOG_FORMAT=json perssua 2>&1 | jq
   "level": "INFO",
   "module": "launcher",
   "message": "Starting Perssua launcher",
-  "version": "0.23.3"
+  "version": "0.27.5"
 }
 {
   "timestamp": "2026-07-06T15:42:30.234Z",

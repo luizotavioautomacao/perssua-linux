@@ -126,7 +126,7 @@ a) **Free up disk space:**
 b) **Re-extract manually:**
    ```bash
    cd bin/
-   ./Perssua-0.23.3-x86_64.AppImage --appimage-extract
+   ./Perssua-0.27.5-x86_64.AppImage --appimage-extract
    # If this works, the issue was with launcher detection
    ```
 
@@ -493,7 +493,7 @@ PERSSUA_DEBUG=1 perssua
 
 # Test extraction directly
 cd bin/
-./Perssua-0.23.3-x86_64.AppImage --appimage-extract
+./Perssua-0.27.5-x86_64.AppImage --appimage-extract
 
 # Check Makefile targets
 make help
@@ -539,4 +539,4 @@ tail -20 data/logs/*
 ---
 
 **Last Updated:** 2026-07-06  
-**Version:** 0.23.3
+**Version:** 0.27.5

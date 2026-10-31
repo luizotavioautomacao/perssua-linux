@@ -8,6 +8,8 @@ SHELL := /bin/bash
 PROJECT_ROOT := $(shell pwd)
 BIN_DIR := $(PROJECT_ROOT)/bin
 PERSSUA := $(BIN_DIR)/perssua
+VERSION := 0.27.5
+APPIMAGE := $(BIN_DIR)/Perssua-$(VERSION)-x86_64.AppImage
 
 # Color output
 BOLD := $(shell printf '\033[1m')
@@ -135,7 +137,7 @@ validate:
 	@echo "$(BLUE)[Check] Validating prerequisites...$(RESET)"
 	@which fusermount3 >/dev/null 2>&1 && echo "$(GREEN)✓ FUSE3 installed$(RESET)" || echo "$(YELLOW)✗ FUSE3 not found$(RESET)"
 	@[[ -f "$(PERSSUA)" ]] && echo "$(GREEN)✓ Launcher found$(RESET)" || echo "$(YELLOW)✗ Launcher not found$(RESET)"
-	@[[ -f "$(BIN_DIR)/Perssua-0.23.3-x86_64.AppImage" ]] && echo "$(GREEN)✓ AppImage found$(RESET)" || echo "$(YELLOW)✗ AppImage not found$(RESET)"
+	@[[ -f "$(APPIMAGE)" ]] && echo "$(GREEN)✓ AppImage found$(RESET)" || echo "$(YELLOW)✗ AppImage not found$(RESET)"
 	@which perssua >/dev/null 2>&1 && echo "$(GREEN)✓ perssua command available$(RESET)" || echo "$(YELLOW)✗ perssua not in PATH$(RESET)"
 
 clean:
